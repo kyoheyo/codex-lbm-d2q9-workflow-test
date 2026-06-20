@@ -107,11 +107,7 @@ Summary runCpu(const Config& cfg, Field* outField) {
             xu /= r;
             yu /= r;
 
-            rho[i] = r;
-            ux[i]  = xu;
-            uy[i]  = yu;
-
-            // BGK relaxation
+            // BGK relaxation (rho/ux/uy stored only at end of simulation)
             const double usq = xu * xu + yu * yu;
             for (int q = 0; q < Q; ++q) {
                 const double cu  = Cx[q] * xu + Cy[q] * yu;
