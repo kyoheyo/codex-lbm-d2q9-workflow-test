@@ -18,6 +18,8 @@ builders:
     provider: opencode
     model: bailian/qwen-plus
     base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    config_path: C:\\Users\\1\\.config\\opencode\\opencode.json
+    runtime_config_dir: build\\opencode-config
     key_source: C:\\Users\\1\\Desktop\\api.txt:second-key
     key_index: 1
 

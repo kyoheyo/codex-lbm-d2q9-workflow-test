@@ -97,6 +97,14 @@ if ($keys.Count -le $keyIndex) {
 $env:BAILIAN_API_KEY = $keys[$keyIndex]
 $env:DASHSCOPE_API_KEY = $keys[$keyIndex]
 $env:BAILIAN_BASE_URL = $config.base_url
+if ($config.ContainsKey('config_path')) {
+  $env:OPENCODE_CONFIG = $config.config_path
+}
+if ($config.ContainsKey('runtime_config_dir')) {
+  $runtimeConfigDir = Join-Path $workspace $config.runtime_config_dir
+  New-Item -ItemType Directory -Force -Path $runtimeConfigDir | Out-Null
+  $env:OPENCODE_CONFIG_DIR = $runtimeConfigDir
+}
 
 $prompt = ($PromptArgs -join ' ')
 if (-not $prompt) {
