@@ -150,6 +150,7 @@ Summary runCpu(const Config& cfg, Field* outField) {
                 }
             }
         }
+    }
 
         // ----- Inlet BC: Zou/He velocity inlet at x = 0 --------------------
         for (int y = 0; y < ny; ++y) {
