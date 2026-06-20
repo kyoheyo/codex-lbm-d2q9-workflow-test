@@ -13,8 +13,7 @@
 
 1. Commit contract baseline.
 2. Run Lane A and Lane B in parallel worktrees.
-3. Merge Lane A and Lane B into integration/issue-001.
+3. Merge Lane A and Lane B into integration/issue-1.
 4. Run Lane C from the integrated branch.
 5. Run Lane D after validation.
 6. Push final feature branch, open PR, wait for Actions, and perform Codex review.
-

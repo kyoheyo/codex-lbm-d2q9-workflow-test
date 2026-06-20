@@ -39,7 +39,7 @@ Codex planner 编写并提交 `src/lbm.hpp`——D2Q9 公共 API 合约。所有
 - `docs/agent-plans/issue-001.md`：Agent 调度计划。
 - `.codex-agent-workflow.yml`：工作流配置（含 control_plane 指向 kyoheyo/codex-lbm-d2q9-workflow-test）。
 - `AGENTS.md`：Agent 行为规则。
-- `config/builders.yml`：Builder API 密钥与端点配置。
+- `config/builders.yml`：Builder 非密钥端点、模型与密钥来源配置；真实密钥不进入仓库。
 - `scripts/builders/*.ps1`：Builder 包装器脚本。
 - `scripts/workflow-preflight.ps1`、`scripts/workflow-integration-check.ps1`：工作流辅助脚本。
 - `.github/workflows/ci.yml`：GitHub Actions CI 定义。
@@ -51,7 +51,7 @@ Codex planner 编写并提交 `src/lbm.hpp`——D2Q9 公共 API 合约。所有
 
 **GitHub Issue #1 创建**
 
-Codex 在远端仓库创建 Issue #1，标题 `[Agent Task]: D2Q9 CUDA LBM 圆柱绕流`，使用 `agent-task` 模板，标签 `agent:todo`。
+Codex 通过 GitHub connector 创建 [Issue #1](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/issues/1)，标题 `Implement D2Q9 CUDA LBM cylinder-wake workflow test`。
 
 ---
 
@@ -114,7 +114,7 @@ Claude builder 实现 `src/lbm_cuda.cu`，含 6 个 CUDA 内核和完整的 `run
 
 #### 集成分支创建
 
-Codex supervisor 从 `main` 创建 `integration/issue-001`，依次合并 `builder/bailian-cpu-core` 和 `builder/claude-cuda-backend`。
+Codex supervisor 从 `main` 创建 `integration/issue-1`，依次合并 `builder/bailian-cpu-core` 和 `builder/claude-cuda-backend`。
 
 #### Gate 执行
 
@@ -187,7 +187,7 @@ Claude builder 对 `src/lbm_cpu.cpp` 进行了以下修复：
 
 #### 合并
 
-Codex supervisor 将 `builder/claude-cpu-stability-fix` 合并到 `integration/issue-001`（提交 `475bb70`）。
+Codex supervisor 将 `builder/claude-cpu-stability-fix` 合并到 `integration/issue-1`（提交 `475bb70`）。
 
 ---
 
@@ -223,7 +223,7 @@ Codex supervisor 将 `builder/claude-cpu-stability-fix` 合并到 `integration/i
 
 #### 合并
 
-Codex supervisor 将 `builder/bailian-tests-runner` 合并到 `integration/issue-001`（提交 `6eb2842`）。
+Codex supervisor 将 `builder/bailian-tests-runner` 合并到 `integration/issue-1`（提交 `6eb2842`）。
 
 ---
 
@@ -250,9 +250,9 @@ Running CUDA backend...
 CUDA Summary:
   Grid size: 160x80
   Iterations: 180
-  Density range: [0.987654, 1.012346]
-  Mass: 12789.345678
-  Sample velocity (center): (0.059876, -0.001234)
+  Density range: [0.963524, 1.050477]
+  Mass: 12538.136154
+  Sample velocity (center): (0.051157, -0.000079)
 LBM_VALIDATION_OK
 
 Validating CSV output...
@@ -287,38 +287,35 @@ LBM_VALIDATION_OK
 
 ---
 
-### Phase 8 — 远端 PR、Actions、Review（待执行）
+### Phase 8 — 远端 PR、Actions、Review
 
 #### 远端 Push 与 PR
 
-<!-- TODO: 记录实际执行的 git push 命令和远端 feature 分支名 -->
-
-- **Feature 分支**：`feature/issue-001-d2q9-cuda-lbm`
-- **PR URL**：[待填写]
-- **PR 创建时间**：[待填写]
+- **Feature 分支**：`codex/issue-1-lbm-d2q9`
+- **PR URL**：[#2](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/pull/2)
+- **PR 创建时间**：`2026-06-20T12:38:40Z`
+- **认证说明**：GitHub CLI 登录由系统凭据存储管理；受限执行环境中通过 `gh auth token` 临时注入 Git HTTP Authorization header，未输出或写入 token。
 
 #### GitHub Actions CI
 
-<!-- TODO: 记录实际 Actions run 触发时间和结果 -->
-
-- **CI Run URL**：[待填写]
+- **首次 CI Run**：[#27871423024](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/actions/runs/27871423024)，成功。
+- **修复后 CI Run**：[#27871525664](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/actions/runs/27871525664)，成功。
 - **触发方式**：`pull_request` 事件
 - **运行环境**：`ubuntu-latest`（CPU 回退路径）
-- **CI 结果**：[待确认]
-- **产物**：`out/cylinder_wake.csv`（Actions artifact）
+- **CI 结果**：成功；`validate` job 全部步骤通过。
+- **产物**：`cylinder-wake-csv`，artifact ID `7765392870`，大小 `37084` 字节，SHA-256 `8a9c4c3bf3a9a7af72124cf2e9467ea8ce94f24c13bb8aff9c7eb9e53b8fcc88`。
 
 #### Codex Supervisor Review
 
-<!-- TODO: 记录 Codex reviewer 的审查结论 -->
-
-- **Review URL**：[待填写]
+- **首次 Review**：[changes-requested](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/pull/2#pullrequestreview-4537501722)
+- **最终 Review**：[approved-by-supervisor](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/pull/2#pullrequestreview-4537515438)
 - **审查维度**：
-  - [ ] Diff 在 lane 允许文件范围内
-  - [ ] CI 通过（含 `LBM_TESTS_OK` + `LBM_VALIDATION_OK`）
-  - [ ] CSV 产物非空且格式正确
-  - [ ] Gate 重跑通过
-- **审查结论**：[待填写]
-- **合并状态**：[待确认]
+  - [x] Diff 在 lane 允许文件范围内
+  - [x] CI 通过（含 `LBM_TESTS_OK` + `LBM_VALIDATION_OK`）
+  - [x] CSV 产物非空且格式正确
+  - [x] Gate 重跑通过
+- **审查结论**：Supervisor 批准。首次审查提出的掩码面积断言、文档真实数值与远端证据问题均已修复。
+- **合并状态**：PR 推进到 ready for review 后交由使用者决定；本次测试不自动合并。
 
 ---
 
@@ -362,7 +359,7 @@ LBM_VALIDATION_OK
 | PowerShell | Windows PowerShell 5.1+ |
 | g++ | C++17 |
 | nvcc | NVIDIA CUDA Toolkit |
-| GPU | NVIDIA GeForce RTX（待确认具体型号） |
+| GPU | NVIDIA GeForce GTX 1650 |
 | Git | 含 worktree 支持 |
 
 ### Builder API 后端

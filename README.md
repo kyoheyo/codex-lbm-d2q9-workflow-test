@@ -35,7 +35,7 @@
 │   ├── agent-plans/issue-001.md     # Agent 调度计划
 │   ├── runs/issue-001-run-log.md    # 执行日志
 │   └── user-end-to-end-guide.md     # 使用者视角端到端记录
-├── config/builders.yml              # Builder 密钥与端点配置
+├── config/builders.yml              # Builder 非密钥端点与密钥来源配置
 ├── .codex-agent-workflow.yml        # 工作流定义与 agent 注册
 ├── .github/
 │   ├── workflows/ci.yml             # GitHub Actions CI（CPU 回退验证）
@@ -123,9 +123,10 @@ nvcc -std=c++17 -O2 -Isrc -DLBM_WITH_CUDA src/main.cpp src/lbm_cpu.cpp src/lbm_c
 
 - **GitHub**：[kyoheyo/codex-lbm-d2q9-workflow-test](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test)
 - **Issue**：[#1 - D2Q9 CUDA LBM 圆柱绕流](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/issues/1)
-- **PR**：<!-- TODO: 填写远端 feature PR URL -->
-- **Actions**：<!-- TODO: 填写 GitHub Actions run URL -->
-- **Review**：<!-- TODO: 填写 Codex supervisor review 结论 -->
+- **PR**：[#2 - implement D2Q9 CUDA LBM cylinder wake](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/pull/2)
+- **Actions**：[run 27871525664 - success](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/actions/runs/27871525664)
+- **Artifact**：cylinder-wake-csv，ID 7765392870，37,084 bytes
+- **Review**：[approved-by-supervisor](https://github.com/kyoheyo/codex-lbm-d2q9-workflow-test/pull/2#pullrequestreview-4537515438)
 
 ## 许可证
 
