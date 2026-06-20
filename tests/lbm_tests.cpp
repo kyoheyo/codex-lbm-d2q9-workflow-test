@@ -53,6 +53,15 @@ void testCylinderMask() {
     int outerIdx = (static_cast<int>(cy) + 11) * nx + static_cast<int>(cx);
     assert(mask[outerIdx] == 0);
 
+    // Count solid cells and verify reasonable match to pi*r*r
+    int solidCount = 0;
+    for (int i = 0; i < nx * ny; ++i) {
+        if (mask[i] == 1) solidCount++;
+    }
+    double expectedArea = M_PI * r * r;
+    double tolerance = 0.15 * expectedArea;
+    assert(std::abs(solidCount - expectedArea) <= tolerance);
+
     std::cout << "OK\n";
 }
 
