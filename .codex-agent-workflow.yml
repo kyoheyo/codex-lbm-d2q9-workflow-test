@@ -9,15 +9,22 @@ control_plane:
 workflow:
   activation: opt-in
   default_mode: normal
+  target_completion_level: pr-complete
   require_gates: true
   require_lanes_for_complex_tasks: true
   allow_builder_gate_edits: false
   ask_when_risky_without_opt_in: true
   require_git_baseline: true
+  require_builder_health_check: true
   require_lane_dependency_graph: true
+  require_isolated_worktrees_for_parallel_builders: true
   require_integration_gate_for_multi_branch: true
+  require_final_head_remote_evidence: true
   builder_stdout_is_advisory: true
   prefer_non_codex_builders: true
+  transient_retry_limit: 1
+  same_blocker_stop_count: 3
+  merge_requires_explicit_authorization: true
 
 modes:
   normal:
@@ -63,7 +70,7 @@ agents:
       enabled: true
       provider: codex-cli
       role: builder
-      model: gpt-5-codex
+      model: gpt-5.5
       command: powershell -ExecutionPolicy Bypass -File scripts\\builders\\codex-botcf-builder.ps1
       auth: api-file-env-injection
       builder_config: config\\builders.yml:codex-builder
