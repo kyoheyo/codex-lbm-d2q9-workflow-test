@@ -6,12 +6,12 @@ Issue: #3
 Lane ID: lane-a-cpu-opt
 Version: 1
 Lane Type: core/refactor
-Status: pending
+Status: accepted-after-reassignment
 Owner: Codex
 
 ## Goal
 
-Remove the unused periodic CPU macroscopic-field sweep without changing observable solver behavior.
+Remove the unused periodic CPU macroscopic-field sweep and directly exposed redundant traversal work without changing observable solver behavior, row-major order, boundary logic, or floating-point expressions.
 
 ## Out Of Scope
 
@@ -24,9 +24,11 @@ Remove the unused periodic CPU macroscopic-field sweep without changing observab
 - Model: configured DeepSeek model through the `opus` alias
 - Fallback: none before Codex inspection
 
+Final assignment note: `claude-builder` was stopped after repeated scope and evidence violations. The accepted repair branch used `bailian-opencode-builder` with `bailian/qwen-plus`; Codex retained merge and gate ownership.
+
 ## Branch And Worktree
 
-- Branch: `builder/claude-issue-3-cpu-opt`
+- Branch: `builder/bailian-issue-3-cpu-repair` (accepted); `builder/claude-issue-3-cpu-opt` (rejected evidence retained)
 - Worktree: sibling workflow test worktree directory
 - Runtime state: isolated
 

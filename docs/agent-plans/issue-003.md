@@ -20,7 +20,8 @@ The task must also prove that the corrected workflow rules reliably handle commi
 
 Included:
 
-- Remove only the unused periodic CPU macroscopic sweep.
+- Remove the unused periodic CPU macroscopic sweep and any directly exposed dead stores.
+- If the fixed 3% gate remains RED, allow one Codex-approved traversal-only repair that preserves row-major order and numerical expressions.
 - Preserve the final macroscopic field, summary, CSV, public API, and numerical boundary behavior.
 - Add a CPU-only benchmark harness that compares prebuilt baseline and candidate executables.
 - Validate local CPU performance, existing tests, local CUDA behavior, remote CPU fallback, and artifact output.
@@ -34,7 +35,7 @@ Out Of Scope:
 
 ## Proposed Design
 
-Lane A makes a minimal refactor in `src/lbm_cpu.cpp`: remove the periodic summary block inside the time-stepping loop and retain the existing final macroscopic and summary calculation. Lane B adds a PowerShell benchmark harness that runs two CPU-only executables with one warmup and seven measured runs, parses their summaries, compares CSV output, computes median wall time, and emits structured markers.
+Lane A starts with a minimal refactor in `src/lbm_cpu.cpp`: remove the periodic summary block inside the time-stepping loop and retain the existing final macroscopic and summary calculation. If the fixed performance gate remains below 3%, Codex may approve a focused repair that removes stores made dead by that refactor or replaces the row-major streaming loop's divmod coordinate recovery with equivalent nested traversal. Lane B adds a PowerShell benchmark harness that runs two CPU-only executables with one warmup and seven measured runs, parses their summaries, compares CSV output, computes median wall time, and emits structured markers.
 
 The lanes edit disjoint files and depend only on this approved contract. Codex owns baseline measurement, builder inspection, integration, correctness comparison, performance judgment, remote delivery, and final review.
 
@@ -69,7 +70,7 @@ planning/performance RED baseline
 
 | Lane | Type | Goal | Allowed Files | Depends On | Overlap | Builder | Gate |
 |---|---|---|---|---|---|---|---|
-| lane-a-cpu-opt | core/refactor | Remove unused periodic CPU macro sweeps | `src/lbm_cpu.cpp` | planning baseline | none | claude-builder / DeepSeek | issue-003-lane-a |
+| lane-a-cpu-opt | core/refactor | Remove redundant CPU work while preserving row-major and numerical behavior | `src/lbm_cpu.cpp` | planning baseline | none | Claude/DeepSeek, reassigned to Bailian/Qwen Plus after blocker | issue-003-lane-a |
 | lane-b-benchmark | validation | Add CPU comparison benchmark | `scripts/benchmark_cpu.ps1` | planning baseline | none | bailian-opencode-builder / Qwen Plus | issue-003-lane-b |
 | integration | integration | Merge and independently validate | workflow evidence only | lanes A and B | none | active Codex | issue-003-integration |
 

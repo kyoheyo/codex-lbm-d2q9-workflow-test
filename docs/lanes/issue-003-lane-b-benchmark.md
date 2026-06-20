@@ -6,7 +6,7 @@ Issue: #3
 Lane ID: lane-b-benchmark
 Version: 1
 Lane Type: validation
-Status: pending
+Status: accepted
 Owner: Codex
 
 ## Goal

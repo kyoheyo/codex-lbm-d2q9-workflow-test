@@ -30,4 +30,13 @@ Prove that the benchmark harness compares two prebuilt CPU executables reproduci
 
 ## Evidence
 
-Record builder head SHA, complete baseline diff, negative-path checks, and Codex independent execution.
+Decision: accepted after two review repairs.
+
+- Accepted branch: `builder/bailian-issue-3-benchmark`
+- Accepted head: `3c7e7ff08c681c3f82a836afde94900bed8bba1d`
+- Changed files against the planning baseline: exactly `scripts/benchmark_cpu.ps1`.
+- Missing baseline executable: independent process exit 1.
+- Same executable as baseline and candidate: independent process exit 1 at the insufficient-improvement check, after interface and numerical parsing succeeded.
+- Initial implementation used unsupported `-i/-o` arguments and the wrong CSV path; commit `1001ef1` repaired the real CLI and output contract.
+- Initial timing used `Tee-Object` inside the measured interval; commit `3c7e7ff` replaced it with direct child-process timing.
+- Integration success emitted baseline/candidate medians, numerical PASS, and `LBM_BENCHMARK_OK`.
