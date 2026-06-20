@@ -85,24 +85,26 @@ function Invoke-Executable {
     )
 
     $outDir = Join-Path $WorkingDir "out"
-    if (-not (Test-Path -LiteralPath $outDir)) {
-        New-Item -ItemType Directory -Path $outDir | Out-Null
+    if (Test-Path -LiteralPath $outDir) {
+        Remove-Item -Recurse -Force -LiteralPath $outDir
     }
+    New-Item -ItemType Directory -Path $outDir | Out-Null
 
-    $csvPath = Join-Path $outDir "output.csv"
+    $csvPath = Join-Path $outDir "cylinder_wake.csv"
     $logPath = Join-Path $WorkingDir "run_${RunNumber}.log"
 
     $start = Get-Date
-    & $ExePath -i $Iters -o $outDir | Tee-Object -FilePath $logPath
+    Push-Location $WorkingDir; try { & $ExePath $Iters | Tee-Object -FilePath $logPath } finally { Pop-Location }
     $end = Get-Date
 
     $exitCode = $LASTEXITCODE
     $logContent = Get-Content -LiteralPath $logPath -Raw
 
     # Parse console output for density, mass, velocity
-    $densityMatch = $logContent | Select-String -Pattern "density.*min:\s*([\d.eE+-]+)\s*max:\s*([\d.eE+-]+)" | ForEach-Object { $_.Matches.Groups[1].Value, $_.Matches.Groups[2].Value }
-    $massMatch = $logContent | Select-String -Pattern "mass:\s*([\d.eE+-]+)" | ForEach-Object { $_.Matches.Groups[1].Value }
-    $velMatch = $logContent | Select-String -Pattern "sample velocity:\s*([\d.eE+-]+)" | ForEach-Object { $_.Matches.Groups[1].Value }
+    # Exact patterns: "Density range: [min, max]", "Mass: value", "Sample velocity (center): (ux, uy)"
+    $densityMatch = $logContent | Select-String -Pattern "Density range:\s*\[([\d.eE+-]+),\s*([\d.eE+-]+)\]" | ForEach-Object { $_.Matches.Groups[1].Value, $_.Matches.Groups[2].Value }
+    $massMatch = $logContent | Select-String -Pattern "Mass:\s*([\d.eE+-]+)" | ForEach-Object { $_.Matches.Groups[1].Value }
+    $velMatch = $logContent | Select-String -Pattern "Sample velocity \(center\):\s*\(([\d.eE+-]+),\s*([\d.eE+-]+)\)" | ForEach-Object { $_.Matches.Groups[1].Value, $_.Matches.Groups[2].Value }
 
     [PSCustomObject]@{
         ExitCode = $exitCode
@@ -111,7 +113,8 @@ function Invoke-Executable {
         DensityMin = if ($densityMatch) { [double]$densityMatch[0] } else { $null }
         DensityMax = if ($densityMatch) { [double]$densityMatch[1] } else { $null }
         Mass = if ($massMatch) { [double]$massMatch[0] } else { $null }
-        Velocity = if ($velMatch) { [double]$velMatch[0] } else { $null }
+        SampleUx = if ($velMatch) { [double]$velMatch[0] } else { $null }
+        SampleUy = if ($velMatch) { [double]$velMatch[1] } else { $null }
         CsvPath = $csvPath
     }
 }
@@ -138,6 +141,20 @@ if (-not (Test-Path -LiteralPath $BaselineExe -PathType Leaf)) {
 }
 if (-not (Test-Path -LiteralPath $CandidateExe -PathType Leaf)) {
     Write-Error "Candidate executable not found: $CandidateExe"
+    exit 1
+}
+
+# Ensure executables are readable
+try {
+    Get-Content -LiteralPath $BaselineExe -TotalCount 1 | Out-Null
+} catch {
+    Write-Error "Baseline executable not readable: $BaselineExe"
+    exit 1
+}
+try {
+    Get-Content -LiteralPath $CandidateExe -TotalCount 1 | Out-Null
+} catch {
+    Write-Error "Candidate executable not readable: $CandidateExe"
     exit 1
 }
 
@@ -240,7 +257,10 @@ try {
         [Math]::Abs($baselineRun.DensityMin - $candidateRun.DensityMin) -gt $NumericTolerance -or
         [Math]::Abs($baselineRun.DensityMax - $candidateRun.DensityMax) -gt $NumericTolerance -or
         [Math]::Abs($baselineRun.Mass - $candidateRun.Mass) -gt $NumericTolerance -or
-        [Math]::Abs($baselineRun.Velocity - $candidateRun.Velocity) -gt $NumericTolerance) {
+        $null -eq $baselineRun.SampleUx -or $null -eq $candidateRun.SampleUx -or
+        [Math]::Abs($baselineRun.SampleUx - $candidateRun.SampleUx) -gt $NumericTolerance -or
+        $null -eq $baselineRun.SampleUy -or $null -eq $candidateRun.SampleUy -or
+        [Math]::Abs($baselineRun.SampleUy - $candidateRun.SampleUy) -gt $NumericTolerance) {
         Write-Error "Console output numeric mismatch"
         exit 1
     }
