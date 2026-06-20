@@ -1,0 +1,12 @@
+build/
+out/
+worktrees/
+*.exe
+*.obj
+*.lib
+*.exp
+*.pdb
+*.log
+.env
+.env.*
+

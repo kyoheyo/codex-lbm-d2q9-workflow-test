@@ -1,0 +1,51 @@
+- name: agent:todo
+  color: "ededed"
+  description: Agent task is ready to be planned or assigned.
+- name: agent:in-progress
+  color: "0e8a16"
+  description: Builder agent is working on this task.
+- name: agent:needs-review
+  color: "fbca04"
+  description: Task or PR is ready for Codex review.
+- name: agent:changes-requested
+  color: "d93f0b"
+  description: Codex requested fixes from the builder.
+- name: agent:blocked
+  color: "b60205"
+  description: Task is blocked by missing human or external decision.
+- name: agent:done
+  color: "5319e7"
+  description: Task passed review and is complete.
+- name: role:architect
+  color: "1d76db"
+  description: Planning, design, and acceptance criteria work.
+- name: role:builder
+  color: "0052cc"
+  description: Implementation work by a builder agent.
+- name: role:reviewer
+  color: "5319e7"
+  description: Codex review or supervisor work.
+- name: priority:p0
+  color: "b60205"
+  description: Highest priority.
+- name: priority:p1
+  color: "d93f0b"
+  description: High priority.
+- name: priority:p2
+  color: "fbca04"
+  description: Normal priority.
+- name: type:feature
+  color: "0e8a16"
+  description: Feature work.
+- name: type:bug
+  color: "d73a4a"
+  description: Bug fix.
+- name: type:refactor
+  color: "c5def5"
+  description: Refactoring work.
+- name: type:test
+  color: "bfdadc"
+  description: Test work.
+- name: type:docs
+  color: "0075ca"
+  description: Documentation work.

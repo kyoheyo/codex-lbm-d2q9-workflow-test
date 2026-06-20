@@ -1,0 +1,20 @@
+name: lbm-ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate CPU fallback and tests
+        shell: pwsh
+        run: ./scripts/validate.ps1
+      - name: Upload cylinder wake output
+        uses: actions/upload-artifact@v4
+        with:
+          name: cylinder-wake-csv
+          path: out/cylinder_wake.csv
+

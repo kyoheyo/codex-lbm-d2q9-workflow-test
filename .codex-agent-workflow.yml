@@ -1,0 +1,187 @@
+enabled: true
+
+control_plane:
+  type: github
+  owner: kyoheyo
+  repo: codex-lbm-d2q9-workflow-test
+  default_base_branch: main
+
+workflow:
+  activation: opt-in
+  default_mode: normal
+  require_gates: true
+  require_lanes_for_complex_tasks: true
+  allow_builder_gate_edits: false
+  ask_when_risky_without_opt_in: true
+  require_git_baseline: true
+  require_lane_dependency_graph: true
+  require_integration_gate_for_multi_branch: true
+  builder_stdout_is_advisory: true
+  prefer_non_codex_builders: true
+
+modes:
+  normal:
+    description: Ordinary Codex question, investigation, small edit, or quick fix.
+    creates_issues: false
+    creates_gates: false
+    creates_lanes: false
+  workflow:
+    description: Full GitHub + Codex + architect-loop workflow.
+    creates_issues: true
+    creates_gates: true
+    creates_lanes: true
+    requires_builder_dispatch: true
+  supervisor:
+    description: Review existing PR, CI, builder output, or agent result.
+    creates_issues: false
+    implements_changes: false
+
+agents:
+  planner:
+    id: codex-planner
+    provider: codex
+    role: planner
+    model: gpt-5
+    mode: interactive
+
+  supervisor:
+    id: codex-supervisor
+    provider: codex
+    role: supervisor
+    model: gpt-5
+    mode: interactive
+
+  reviewer:
+    id: codex-reviewer
+    provider: codex
+    role: reviewer
+    model: gpt-5
+    mode: interactive
+
+  builders:
+    - id: codex-builder
+      enabled: true
+      provider: codex-cli
+      role: builder
+      model: gpt-5-codex
+      command: powershell -ExecutionPolicy Bypass -File scripts\\builders\\codex-botcf-builder.ps1
+      auth: api-file-env-injection
+      builder_config: config\\builders.yml:codex-builder
+      auth_source: config\\builders.yml:codex-builder.key_source
+      env_keys:
+        - BOTCF_API_KEY
+      config_home: C:\\Users\\1\\.codex-builders\\codex-botcf
+      sandbox: danger-full-access
+      safety_note: Use only in a dedicated builder branch or worktree; Codex reviewer must inspect all diffs before merge.
+      config_files:
+        - C:\\Users\\1\\.codex-builders\\codex-botcf\\config.toml
+      note: External Codex CLI builder with isolated CODEX_HOME and BotCF GPT-5.5 API; distinct from the active Codex planner/supervisor/reviewer session.
+      selection_policy: use_only_when_explicit_or_required
+      strengths:
+        - code-editing
+        - tests
+        - refactor
+        - ci-fix
+      max_parallel_lanes: 2
+
+    - id: claude-builder
+      enabled: true
+      provider: claude-code
+      role: builder
+      model: opus
+      command: powershell -ExecutionPolicy Bypass -File scripts\\builders\\claude-deepseek-builder.ps1
+      auth: api-file-env-injection
+      builder_config: config\\builders.yml:claude-builder
+      auth_source: config\\builders.yml:claude-builder.key_source
+      env_keys:
+        - ANTHROPIC_AUTH_TOKEN
+        - ANTHROPIC_BASE_URL
+      strengths:
+        - architecture
+        - large-context
+        - code-review
+        - refactor
+      max_parallel_lanes: 1
+
+    - id: cursor-builder
+      enabled: false
+      deprecated: true
+      provider: cursor
+      role: builder
+      model: project-default
+      command: manual
+      disabled_reason: Deprecated for phase one; no automatic Cursor builder integration is configured.
+      strengths:
+        - frontend
+        - ui
+        - interactive-editing
+      max_parallel_lanes: 1
+
+    - id: bailian-opencode-builder
+      enabled: true
+      provider: opencode
+      role: builder
+      model: bailian/qwen-plus
+      command: powershell -ExecutionPolicy Bypass -File scripts\\builders\\bailian-opencode-builder.ps1
+      auth: api-file-env-injection
+      builder_config: config\\builders.yml:bailian-opencode-builder
+      auth_source: config\\builders.yml:bailian-opencode-builder.key_source
+      env_keys:
+        - BAILIAN_API_KEY
+        - DASHSCOPE_API_KEY
+      strengths:
+        - code-editing
+        - chinese-context
+        - qwen-models
+        - tests
+      max_parallel_lanes: 1
+
+  researchers:
+    - id: gemini-researcher
+      provider: gemini
+      role: researcher
+      model: gemini-pro
+      command: manual
+      strengths:
+        - web-research
+        - long-context
+        - second-opinion
+
+dispatch:
+  mode: manual
+  selection_policy: capability_match
+  allow_user_override: true
+  default_builder_order:
+    - claude-builder
+    - bailian-opencode-builder
+    - codex-builder
+  codex_builder_policy: explicit_user_request_or_no_viable_alternative
+  lane_decomposition:
+    require_contract_first_when_api_unknown: true
+    prefer_small_lanes: true
+    split_large_core_implementation: true
+    sequence_tests_after_contract_or_core_api: true
+  overlap_policy:
+    default: avoid
+    allow_declared_shared_files: true
+    require_merge_owner: true
+    require_merge_order: true
+    semantic_overlap_default: sequence
+  required_dispatch_fields:
+    - builder_agent_id
+    - provider
+    - model
+    - branch_or_worktree
+    - lane_file
+    - gate_file
+    - allowed_files
+    - dependencies
+    - overlap_level
+    - merge_owner
+    - validation_commands
+  fallback_builder: bailian-opencode-builder
+
+ci:
+  required_checks:
+    - workflow-sanity
+  project_checks: []

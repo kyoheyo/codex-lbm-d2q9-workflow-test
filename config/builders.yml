@@ -1,0 +1,31 @@
+builders:
+  claude-builder:
+    provider: claude-code
+    model: opus
+    command_path: C:\\Users\\1\\Documents\\Codex\\2026-06-20\\code\\.npm-global\\claude.cmd
+    base_url: https://api.deepseek.com/anthropic
+    key_source: C:\\Users\\1\\Desktop\\api.txt:first-key
+    key_index: 0
+    env:
+      ANTHROPIC_MODEL: deepseek-v4-pro[1m]
+      ANTHROPIC_DEFAULT_OPUS_MODEL: deepseek-v4-pro[1m]
+      ANTHROPIC_DEFAULT_SONNET_MODEL: deepseek-v4-pro[1m]
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: deepseek-v4-flash[1m]
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+      CLAUDE_CODE_EFFORT_LEVEL: max
+
+  bailian-opencode-builder:
+    provider: opencode
+    model: bailian/qwen-plus
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    key_source: C:\\Users\\1\\Desktop\\api.txt:second-key
+    key_index: 1
+
+  codex-builder:
+    provider: codex-cli
+    model: gpt-5.5
+    base_url: https://api.botcf.com/v1
+    key_source: C:\\Users\\1\\Desktop\\api.txt:third-key
+    key_index: 2
+    codex_home: C:\\Users\\1\\.codex-builders\\codex-botcf
+    sandbox: danger-full-access
