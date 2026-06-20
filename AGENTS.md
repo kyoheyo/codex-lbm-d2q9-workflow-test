@@ -53,8 +53,8 @@ Workflow Mode requires:
 - Gate file under `docs/gates/`.
 - Lane file under `docs/lanes/` when work is complex or parallelizable.
 - Builder dispatch block that states the selected builder agent and model.
-- PR using `.github/pull_request_template.md`.
-- CI and gate review before done.
+- Gate review before done.
+- PR using `.github/pull_request_template.md` and CI verification when the selected completion level requires remote delivery.
 
 ### Supervisor Mode
 
@@ -72,15 +72,27 @@ Supervisor Mode reads existing issue, PR, diff, CI output, gates, lanes, or buil
 
 If a task appears high-risk but the user did not explicitly opt in, ask: 这个任务要走完整工程协作流程，还是先按普通 Codex 任务处理？
 
+## Workflow Preflight
+
+- Complete Workflow Preflight before dispatching any builder.
+- Verify the Git repository and committed baseline, project workflow configuration, selected builder health, and any GitHub access required by the target completion level.
+- Do not dispatch while the decision is `preflight-blocked`.
+- Record existing staged, unstaged, and untracked changes without reverting user work.
+- If ownership of dirty-worktree changes is ambiguous, stop and ask the user before isolating, committing, or dispatching work.
+- External builders must be confirmed available and use isolated mutable runtime, cache, and authentication state where supported.
+
 ## Role Boundaries
 
 - Codex is the default planner, supervisor, and reviewer.
-- Builder agents implement scoped lanes and submit PRs.
+- Builder agents implement scoped lanes and produce traceable commits on assigned branches. They open PRs only when the lane dispatch or project policy requires it.
 - Builder agents must not expand scope without Codex approval.
 - Builder agents must not modify `docs/gates/` unless the issue explicitly requires gate changes.
 - Reviewer decisions must be based on diff, CI, gates, lanes, and acceptance criteria, not builder claims alone.
 - Builder stdout is not authoritative. If a builder times out, returns no text, or claims completion, Codex must inspect git diff, files, and gate output before deciding status.
-- Workflow Mode must start from a real Git repository with a clean baseline commit. If `git rev-parse --is-inside-work-tree` fails or the baseline is not committed, stop and initialize or ask for confirmation before dispatching builders.
+- Workflow Mode must start from a real Git repository with a recorded committed baseline SHA. Identified unrelated user changes may remain isolated; ambiguous or conflicting changes block dispatch. If the repository or committed baseline is missing, stop and initialize or ask for confirmation before dispatching builders.
+- After every builder return, including timeout or non-zero exit, Codex must inspect the assigned worktree, commits, complete baseline diff, changed files, protected files, and required gates.
+- A lane is verified only after its scope and independently executed gates pass.
+- Builder-authored documentation must not present unobserved URLs, SHAs, runtime values, CI results, artifacts, or review decisions as facts.
 
 ## Builder Agent And Model Selection
 
@@ -101,6 +113,7 @@ Builder selection policy:
 - Prefer non-Codex external builders for implementation lanes when they are capable: `claude-builder` for architecture/refactor/review/docs-heavy work and `bailian-opencode-builder` for code/test/Chinese-context lanes.
 - Use `codex-builder` only when the user explicitly requests Codex CLI, when non-Codex builders are unavailable, or when a lane needs Codex CLI-specific behavior.
 - Do not assign an entire large core implementation to one builder unless the Architecture Brief justifies why it cannot be split.
+- Select builders per lane by capability and verified health, not once for the entire issue.
 
 If the user does not specify a builder, select one from `.codex-agent-workflow.yml` by capability match and state the selected agent and model before dispatch.
 
@@ -122,13 +135,36 @@ Every Workflow Mode builder dispatch must include:
 - Each lane must include allowed files and forbidden files.
 - Complex tasks must include a lane dependency graph. Codex should split work by API/contract, implementation area, tests, docs, validation, and integration when possible.
 - Prefer small lanes with clear contracts. If a lane touches many modules, creates a new subsystem, or is likely to produce a long-running builder prompt, Codex should split it before dispatch.
+- Do not use an oversized lane that combines contracts, core implementation, tests, and documentation without a documented Lane Split Exception.
+- Approve cross-lane public contracts before dependent builders implement against them.
 - Different lanes should prefer non-overlapping files. Overlap is allowed only when the lane explicitly declares shared files, merge owner, and conflict strategy.
 - If overlapping edits affect the same source or test file semantics, Codex should usually sequence the lanes instead of running them in parallel.
 - If overlapping edits are documentation, changelog, validation script, or generated integration files, parallel work is acceptable when Codex owns the final merge review.
+- Parallel lanes must use isolated branches/worktrees and mutable runtime directories.
+- Shared-file parallel work must declare an authoritative lane, merge owner, merge order, conflict strategy, and post-merge validation.
+- Builder agents must not merge other builder branches and claim final integration.
 - Codex must check changed files against lane allowed files before approving.
-- Codex must run an integration phase after merging multiple builder branches, because branches can pass individually and fail together.
+- Active Codex owns integration unless the user explicitly assigns a human maintainer.
+- Two or more accepted builder branches require an integration branch or equivalent merge queue and a final integration gate, because branches can pass individually and fail together.
+
+## Remote Completion
+
+- Select `local-complete`, `pr-complete`, `merge-complete`, or `delivery-complete` before remote execution.
+- Evaluate CI, artifacts, and review against the current PR head SHA. A new commit makes prior final-approval evidence stale.
+- Do not rely only on a workflow's top-level conclusion; inspect required jobs, key steps, skips, fallbacks, and required artifacts.
+- Move a draft PR to ready only after final-head CI, required artifacts, required lane gates, any required multi-branch integration gate, scope checks, and a Supervisor Check pass.
+- Do not merge, release, deploy, force-push, or rewrite history without explicit user instruction or project authorization.
+
+## Security And Recovery
+
+- Never write API keys, tokens, authorization headers, or complete secret values to repository files, prompts, workflow records, retained logs, or review comments.
+- Credential exposure sets `security-blocked` and stops builder dispatch and publication until the user confirms containment and a new security baseline is verified.
+- Automatically retry only a confirmed transient failure and at most once.
+- Do not automatically retry code, gate, scope, contract, identity, or security failures.
+- After the same blocker occurs three times, stop automatic recovery and request user input or an external-state change.
+- Do not clear, reuse, or remove a builder worktree until its changes and disposition are recorded. Verify absolute paths before approved cleanup.
 
 ## Completion Rule
 
-Do not mark Workflow Mode work done until issue scope, acceptance criteria, gates, lane scope, PR diff, and CI/gate results all support completion.
+Do not mark Workflow Mode work done until issue scope, acceptance criteria, gates, lane scope, PR diff, integration evidence, and the evidence required by the selected completion level all support completion.
 
