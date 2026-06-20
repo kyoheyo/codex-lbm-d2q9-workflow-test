@@ -45,19 +45,20 @@ std::vector<unsigned char> makeCylinderMask(int nx, int ny, double cx, double cy
 }
 
 Summary runCpu(const Config& cfg, Field* outField) {
-    // Validate config
+    // ---- Validate config --------------------------------------------------
     if (cfg.nx <= 0 || cfg.ny <= 0 || cfg.iterations <= 0 || cfg.tau <= 0.0) {
         throw std::invalid_argument("Invalid configuration: nx, ny, iterations, and tau must be positive");
     }
     if (cfg.tau <= 0.5) {
         throw std::invalid_argument("Invalid configuration: tau must be greater than 0.5");
     }
-    
+
     const int nx = cfg.nx;
     const int ny = cfg.ny;
     const int size = nx * ny;
+    const double omega = 1.0 / cfg.tau;
 
-    // Initialize fields
+    // ---- Allocate fields --------------------------------------------------
     std::vector<double> f(size * Q, 0.0);
     std::vector<double> f_next(size * Q, 0.0);
     std::vector<double> rho(size, 1.0);
@@ -65,165 +66,236 @@ Summary runCpu(const Config& cfg, Field* outField) {
     std::vector<double> uy(size, 0.0);
     std::vector<unsigned char> solid = makeCylinderMask(nx, ny, cfg.cylinderX, cfg.cylinderY, cfg.cylinderRadius);
 
-    // Initial velocity profile: parabolic inflow at left boundary
-    for (int y = 0; y < ny; ++y) {
-        const double dy = static_cast<double>(y) - static_cast<double>(ny) / 2.0;
-        const double uy_in = cfg.inletUx * (1.0 - (dy * dy) / (static_cast<double>(ny) * static_cast<double>(ny) / 4.0));
-        const int idx = y * nx;
-        ux[idx] = cfg.inletUx;
-        uy[idx] = uy_in;
-    }
-
-    // Compute initial f from equilibrium
+    // ---- Initialize: uniform inlet velocity, equilibrium everywhere -------
     for (int i = 0; i < size; ++i) {
-        auto feq = equilibrium(rho[i], ux[i], uy[i]);
+        const double ux0 = solid[i] ? 0.0 : cfg.inletUx;
+        const double uy0 = 0.0;
+        const double rho0 = 1.0;
+        ux[i] = ux0;
+        uy[i] = uy0;
+        rho[i] = rho0;
+        const double usq = ux0 * ux0 + uy0 * uy0;
         for (int q = 0; q < Q; ++q) {
-            f[i * Q + q] = feq[q];
+            const double cu = Cx[q] * ux0 + Cy[q] * uy0;
+            f[i * Q + q] = W[q] * rho0 * (1.0 + 3.0 * cu + 4.5 * cu * cu - 1.5 * usq);
         }
     }
 
-    // Main simulation loop
+    // ---- Summary ----------------------------------------------------------
     Summary summary;
     summary.nx = nx;
     summary.ny = ny;
     summary.iterations = cfg.iterations;
 
+    // ---- Main time-stepping loop ------------------------------------------
     for (int iter = 0; iter < cfg.iterations; ++iter) {
-        // Collision step
+
+        // ----- Collision (in-place on f, skip solid cells) -----------------
         for (int i = 0; i < size; ++i) {
             if (solid[i]) continue;
 
-            // Compute macroscopic quantities
-            rho[i] = 0.0;
-            ux[i] = 0.0;
-            uy[i] = 0.0;
+            // Compute macroscopic moments
+            double r = 0.0, xu = 0.0, yu = 0.0;
             for (int q = 0; q < Q; ++q) {
-                rho[i] += f[i * Q + q];
-                ux[i] += f[i * Q + q] * Cx[q];
-                uy[i] += f[i * Q + q] * Cy[q];
+                const double fi = f[i * Q + q];
+                r  += fi;
+                xu += fi * Cx[q];
+                yu += fi * Cy[q];
             }
-            ux[i] /= rho[i];
-            uy[i] /= rho[i];
+            // Guard against zero/negative density
+            if (r < 1e-12) r = 1.0;
+            xu /= r;
+            yu /= r;
 
-            // Collision: BGK
-            auto feq = equilibrium(rho[i], ux[i], uy[i]);
+            rho[i] = r;
+            ux[i]  = xu;
+            uy[i]  = yu;
+
+            // BGK relaxation
+            const double usq = xu * xu + yu * yu;
             for (int q = 0; q < Q; ++q) {
-                f[i * Q + q] = f[i * Q + q] + (1.0 / cfg.tau) * (feq[q] - f[i * Q + q]);
+                const double cu  = Cx[q] * xu + Cy[q] * yu;
+                const double feq = W[q] * r * (1.0 + 3.0 * cu + 4.5 * cu * cu - 1.5 * usq);
+                f[i * Q + q] += omega * (feq - f[i * Q + q]);
             }
         }
 
-        // Clear next buffer every step
+        // ----- Streaming (pull scheme: f -> f_next) ------------------------
         std::fill(f_next.begin(), f_next.end(), 0.0);
 
-        // Streaming step with non-periodic boundaries
         for (int i = 0; i < size; ++i) {
-            if (solid[i]) {
-                // Cylinder bounce-back: swap populations with opposite directions
-                for (int q = 0; q < Q; ++q) {
-                    const int opp = Opposite[q];
-                    f_next[i * Q + q] = f[i * Q + opp];
-                }
-                continue;
-            }
+            if (solid[i]) continue;   // skip solid destinations
 
             const int x = i % nx;
             const int y = i / nx;
 
-            // Handle boundaries
-            for (int q = 0; q < Q; ++q) {
-                const int x_new = x + Cx[q];
-                const int y_new = y + Cy[q];
-                const int i_new = y_new * nx + x_new;
-                
-                // Left boundary (inlet) - velocity inlet
-                if (x_new < 0 && y_new >= 0 && y_new < ny) {
-                    // Use equilibrium with inlet velocity
-                    auto feq_inlet = equilibrium(rho[i], cfg.inletUx, 0.0);
-                    f_next[i * Q + q] = feq_inlet[q];
-                    continue;
-                }
-                
-                // Right boundary (outlet) - zero-gradient
-                if (x_new >= nx && y_new >= 0 && y_new < ny) {
-                    // Copy from adjacent cell (zero-gradient)
-                    const int i_adj = y_new * nx + (nx - 1);
-                    f_next[i_adj * Q + q] = f[i * Q + q];
-                    continue;
-                }
-                
-                // Top boundary (bounce-back)
-                if (y_new < 0 && x_new >= 0 && x_new < nx) {
-                    // Bounce-back: swap with opposite direction
-                    const int opp = Opposite[q];
-                    const int i_top = 0 * nx + x_new;
-                    f_next[i_top * Q + q] = f[i_top * Q + opp];
-                    continue;
-                }
-                
-                // Bottom boundary (bounce-back)
-                if (y_new >= ny && x_new >= 0 && x_new < nx) {
-                    // Bounce-back: swap with opposite direction
-                    const int opp = Opposite[q];
-                    const int i_bottom = (ny - 1) * nx + x_new;
-                    f_next[i_bottom * Q + q] = f[i_bottom * Q + opp];
-                    continue;
-                }
-                
-                // Regular interior streaming
-                if (x_new >= 0 && x_new < nx && y_new >= 0 && y_new < ny) {
-                    f_next[i_new * Q + q] = f[i * Q + q];
+            for (int d = 0; d < Q; ++d) {
+                const int src_x = x - Cx[d];
+                const int src_y = y - Cy[d];
+
+                if (src_x >= 0 && src_x < nx && src_y >= 0 && src_y < ny) {
+                    // Source is inside the domain
+                    const int src = src_y * nx + src_x;
+                    if (solid[src]) {
+                        // Cylinder bounce-back: particle originates from solid
+                        f_next[i * Q + d] = f[i * Q + Opposite[d]];
+                    } else {
+                        // Normal pull from fluid neighbour
+                        f_next[i * Q + d] = f[src * Q + d];
+                    }
+                } else if (src_x < 0) {
+                    // Left inlet: placeholder (fixed by inlet BC below)
+                    f_next[i * Q + d] = f[i * Q + d];
+                } else if (src_x >= nx) {
+                    // Right outlet: placeholder (fixed by outlet BC below)
+                    f_next[i * Q + d] = f[i * Q + d];
+                } else {
+                    // Top / bottom wall (src_y out of range): bounce-back
+                    f_next[i * Q + d] = f[i * Q + Opposite[d]];
                 }
             }
         }
 
-        // Swap f and f_next
+        // ----- Inlet BC: Zou/He velocity inlet at x = 0 --------------------
+        for (int y = 0; y < ny; ++y) {
+            const int i = y * nx;   // x = 0
+            if (solid[i]) continue;
+
+            const double f0 = f_next[i * Q + 0];
+            const double f2 = f_next[i * Q + 2];
+            const double f4 = f_next[i * Q + 4];
+            const double f3 = f_next[i * Q + 3];
+            const double f6 = f_next[i * Q + 6];
+            const double f7 = f_next[i * Q + 7];
+
+            // Density from known populations + prescribed ux
+            double rho_in = (f0 + f2 + f4 + 2.0 * (f3 + f6 + f7)) / (1.0 - cfg.inletUx);
+
+            // Guard against unphysical density
+            if (rho_in < 0.5 || rho_in > 3.0) {
+                rho_in = 1.0;
+            }
+
+            // Zou/He: set unknown incoming populations
+            f_next[i * Q + 1] = f3 + (2.0 / 3.0) * rho_in * cfg.inletUx;
+            f_next[i * Q + 5] = f7 - 0.5 * (f2 - f4) + (1.0 / 6.0) * rho_in * cfg.inletUx;
+            f_next[i * Q + 8] = f6 + 0.5 * (f2 - f4) + (1.0 / 6.0) * rho_in * cfg.inletUx;
+        }
+
+        // ----- Outlet BC: zero-gradient at x = nx-1 ------------------------
+        for (int y = 0; y < ny; ++y) {
+            const int i     = y * nx + (nx - 1);   // x = nx-1
+            const int i_adj = y * nx + (nx - 2);   // x = nx-2
+            if (solid[i]) continue;
+
+            // Copy unknown (incoming from right) populations from second-to-last column
+            f_next[i * Q + 3] = f_next[i_adj * Q + 3];
+            f_next[i * Q + 6] = f_next[i_adj * Q + 6];
+            f_next[i * Q + 7] = f_next[i_adj * Q + 7];
+        }
+
+        // ----- Swap double buffers -----------------------------------------
         f.swap(f_next);
 
-        // Update summary statistics every 10 iterations
+        // ----- Periodic summary every 10 iterations ------------------------
         if (iter % 10 == 0 || iter == cfg.iterations - 1) {
-            double rhoMin = *std::min_element(rho.begin(), rho.end());
-            double rhoMax = *std::max_element(rho.begin(), rho.end());
-            double mass = std::accumulate(rho.begin(), rho.end(), 0.0);
+            for (int i = 0; i < size; ++i) {
+                if (solid[i]) continue;
+                double r = 0.0, xu = 0.0, yu = 0.0;
+                for (int q = 0; q < Q; ++q) {
+                    const double fi = f[i * Q + q];
+                    r  += fi;
+                    xu += fi * Cx[q];
+                    yu += fi * Cy[q];
+                }
+                if (r > 1e-12) { xu /= r; yu /= r; }
+                else           { xu = 0.0; yu = 0.0; r = 1.0; }
+                rho[i] = r;
+                ux[i]  = xu;
+                uy[i]  = yu;
+            }
+
+            double rhoMin =  1e30;
+            double rhoMax = -1e30;
+            double mass   =  0.0;
+            for (int i = 0; i < size; ++i) {
+                if (solid[i]) continue;
+                const double ri = rho[i];
+                mass += ri;
+                if (ri < rhoMin) rhoMin = ri;
+                if (ri > rhoMax) rhoMax = ri;
+            }
             summary.rhoMin = rhoMin;
             summary.rhoMax = rhoMax;
-            summary.mass = mass;
-            summary.sampleUx = ux[size / 2];
-            summary.sampleUy = uy[size / 2];
+            summary.mass   = mass;
+
+            // Sample velocity at a point downstream of the cylinder
+            int sx = static_cast<int>(cfg.cylinderX + 2.5 * cfg.cylinderRadius);
+            int sy = static_cast<int>(cfg.cylinderY);
+            if (sx >= nx) sx = nx - 1;
+            if (sy <  0) sy = 0;
+            if (sy >= ny) sy = ny - 1;
+            const int si = sy * nx + sx;
+            summary.sampleUx = ux[si];
+            summary.sampleUy = uy[si];
         }
     }
 
-    // Recompute final rho/ux/uy before summary
+    // ---- Final macroscopic state ------------------------------------------
     for (int i = 0; i < size; ++i) {
-        if (solid[i]) continue;
-        rho[i] = 0.0;
-        ux[i] = 0.0;
-        uy[i] = 0.0;
-        for (int q = 0; q < Q; ++q) {
-            rho[i] += f[i * Q + q];
-            ux[i] += f[i * Q + q] * Cx[q];
-            uy[i] += f[i * Q + q] * Cy[q];
+        if (solid[i]) {
+            rho[i] = 1.0;
+            ux[i]  = 0.0;
+            uy[i]  = 0.0;
+            continue;
         }
-        ux[i] /= rho[i];
-        uy[i] /= rho[i];
+        double r = 0.0, xu = 0.0, yu = 0.0;
+        for (int q = 0; q < Q; ++q) {
+            const double fi = f[i * Q + q];
+            r  += fi;
+            xu += fi * Cx[q];
+            yu += fi * Cy[q];
+        }
+        if (r > 1e-12) { xu /= r; yu /= r; }
+        else           { xu = 0.0; yu = 0.0; r = 1.0; }
+        rho[i] = r;
+        ux[i]  = xu;
+        uy[i]  = yu;
     }
 
-    // Update summary from final fields
-    double rhoMin = *std::min_element(rho.begin(), rho.end());
-    double rhoMax = *std::max_element(rho.begin(), rho.end());
-    double mass = std::accumulate(rho.begin(), rho.end(), 0.0);
-    summary.rhoMin = rhoMin;
-    summary.rhoMax = rhoMax;
-    summary.mass = mass;
-    summary.sampleUx = ux[size / 2];
-    summary.sampleUy = uy[size / 2];
+    // ---- Final summary ----------------------------------------------------
+    {
+        double rhoMin =  1e30;
+        double rhoMax = -1e30;
+        double mass   =  0.0;
+        for (int i = 0; i < size; ++i) {
+            if (solid[i]) continue;
+            const double ri = rho[i];
+            mass += ri;
+            if (ri < rhoMin) rhoMin = ri;
+            if (ri > rhoMax) rhoMax = ri;
+        }
+        summary.rhoMin = rhoMin;
+        summary.rhoMax = rhoMax;
+        summary.mass   = mass;
 
-    // Output field if requested
+        int sx = static_cast<int>(cfg.cylinderX + 2.5 * cfg.cylinderRadius);
+        int sy = static_cast<int>(cfg.cylinderY);
+        if (sx >= nx) sx = nx - 1;
+        if (sy <  0) sy = 0;
+        if (sy >= ny) sy = ny - 1;
+        const int si = sy * nx + sx;
+        summary.sampleUx = ux[si];
+        summary.sampleUy = uy[si];
+    }
+
+    // ---- Output field -----------------------------------------------------
     if (outField != nullptr) {
-        outField->nx = nx;
-        outField->ny = ny;
-        outField->rho = std::move(rho);
-        outField->ux = std::move(ux);
-        outField->uy = std::move(uy);
+        outField->nx    = nx;
+        outField->ny    = ny;
+        outField->rho   = std::move(rho);
+        outField->ux    = std::move(ux);
+        outField->uy    = std::move(uy);
         outField->solid = std::move(solid);
     }
 
@@ -233,19 +305,19 @@ Summary runCpu(const Config& cfg, Field* outField) {
 void writeCsv(const std::string& path, const Field& field, int stride) {
     FILE* f = fopen(path.c_str(), "w");
     if (!f) return;
-    
+
     // Write header
     fprintf(f, "x,y,rho,ux,uy\n");
-    
+
     // Write data points
     for (int y = 0; y < field.ny; y += stride) {
         for (int x = 0; x < field.nx; x += stride) {
             const int idx = y * field.nx + x;
-            fprintf(f, "%d,%d,%f,%f,%f\n", x, y, 
+            fprintf(f, "%d,%d,%f,%f,%f\n", x, y,
                     field.rho[idx], field.ux[idx], field.uy[idx]);
         }
     }
-    
+
     fclose(f);
 }
 
@@ -255,7 +327,7 @@ void printSummary(const Summary& summary, const char* backend) {
     printf("  Iterations: %d\n", summary.iterations);
     printf("  Density range: [%.6f, %.6f]\n", summary.rhoMin, summary.rhoMax);
     printf("  Mass: %.6f\n", summary.mass);
-    printf("  Sample velocity (center): (%.6f, %.6f)\n", 
+    printf("  Sample velocity (center): (%.6f, %.6f)\n",
            summary.sampleUx, summary.sampleUy);
 }
 
