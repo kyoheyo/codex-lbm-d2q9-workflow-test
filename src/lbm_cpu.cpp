@@ -196,49 +196,6 @@ Summary runCpu(const Config& cfg, Field* outField) {
 
         // ----- Swap double buffers -----------------------------------------
         f.swap(f_next);
-
-        // ----- Periodic summary every 10 iterations ------------------------
-        if (iter % 10 == 0 || iter == cfg.iterations - 1) {
-            for (int i = 0; i < size; ++i) {
-                if (solid[i]) continue;
-                double r = 0.0, xu = 0.0, yu = 0.0;
-                for (int q = 0; q < Q; ++q) {
-                    const double fi = f[i * Q + q];
-                    r  += fi;
-                    xu += fi * Cx[q];
-                    yu += fi * Cy[q];
-                }
-                if (r > 1e-12) { xu /= r; yu /= r; }
-                else           { xu = 0.0; yu = 0.0; r = 1.0; }
-                rho[i] = r;
-                ux[i]  = xu;
-                uy[i]  = yu;
-            }
-
-            double rhoMin =  1e30;
-            double rhoMax = -1e30;
-            double mass   =  0.0;
-            for (int i = 0; i < size; ++i) {
-                if (solid[i]) continue;
-                const double ri = rho[i];
-                mass += ri;
-                if (ri < rhoMin) rhoMin = ri;
-                if (ri > rhoMax) rhoMax = ri;
-            }
-            summary.rhoMin = rhoMin;
-            summary.rhoMax = rhoMax;
-            summary.mass   = mass;
-
-            // Sample velocity at a point downstream of the cylinder
-            int sx = static_cast<int>(cfg.cylinderX + 2.5 * cfg.cylinderRadius);
-            int sy = static_cast<int>(cfg.cylinderY);
-            if (sx >= nx) sx = nx - 1;
-            if (sy <  0) sy = 0;
-            if (sy >= ny) sy = ny - 1;
-            const int si = sy * nx + sx;
-            summary.sampleUx = ux[si];
-            summary.sampleUy = uy[si];
-        }
     }
 
     // ---- Final macroscopic state ------------------------------------------
