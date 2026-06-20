@@ -119,13 +119,12 @@ Summary runCpu(const Config& cfg, Field* outField) {
         // ----- Streaming (pull scheme: f -> f_next) ------------------------
         std::fill(f_next.begin(), f_next.end(), 0.0);
 
-        for (int i = 0; i < size; ++i) {
-            if (solid[i]) continue;   // skip solid destinations
+        for (int y = 0; y < ny; ++y) {
+            for (int x = 0; x < nx; ++x) {
+                const int i = y * nx + x;
+                if (solid[i]) continue;   // skip solid destinations
 
-            const int x = i % nx;
-            const int y = i / nx;
-
-            for (int d = 0; d < Q; ++d) {
+                for (int d = 0; d < Q; ++d) {
                 const int src_x = x - Cx[d];
                 const int src_y = y - Cy[d];
 
