@@ -93,12 +93,28 @@ function Invoke-Executable {
     $csvPath = Join-Path $outDir "cylinder_wake.csv"
     $logPath = Join-Path $WorkingDir "run_${RunNumber}.log"
 
-    $start = Get-Date
-    Push-Location $WorkingDir; try { & $ExePath $Iters | Tee-Object -FilePath $logPath } finally { Pop-Location }
-    $end = Get-Date
+    # Use System.Diagnostics.Process for precise timing without console overhead
+    $process = New-Object System.Diagnostics.Process
+    $process.StartInfo.FileName = $ExePath
+    $process.StartInfo.Arguments = "$Iters"
+    $process.StartInfo.UseShellExecute = $false
+    $process.StartInfo.CreateNoWindow = $true
+    $process.StartInfo.RedirectStandardOutput = $true
+    $process.StartInfo.RedirectStandardError = $true
+    $process.StartInfo.WorkingDirectory = $WorkingDir
 
-    $exitCode = $LASTEXITCODE
-    $logContent = Get-Content -LiteralPath $logPath -Raw
+    $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    $process.Start() | Out-Null
+    $process.WaitForExit()
+    $stopwatch.Stop()
+
+    $exitCode = $process.ExitCode
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $logContent = $stdout + $stderr
+
+    # Save captured output to log file after timing stops
+    Set-Content -LiteralPath $logPath -Value $logContent
 
     # Parse console output for density, mass, velocity
     # Exact patterns: "Density range: [min, max]", "Mass: value", "Sample velocity (center): (ux, uy)"
@@ -108,7 +124,7 @@ function Invoke-Executable {
 
     [PSCustomObject]@{
         ExitCode = $exitCode
-        WallTimeMs = ($end - $start).TotalMilliseconds
+        WallTimeMs = $stopwatch.Elapsed.TotalMilliseconds
         LogContent = $logContent
         DensityMin = if ($densityMatch) { [double]$densityMatch[0] } else { $null }
         DensityMax = if ($densityMatch) { [double]$densityMatch[1] } else { $null }
