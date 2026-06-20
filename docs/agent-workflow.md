@@ -954,4 +954,3 @@ Use the canonical dispatch template at `docs/builder-dispatch-template.md`. Each
 - CI: remote deterministic validation signal when required.
 - Codex review: final workflow decision.
 - Integration branch: combined proof when two or more builder branches are accepted.
-
