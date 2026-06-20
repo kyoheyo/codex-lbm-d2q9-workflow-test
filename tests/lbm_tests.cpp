@@ -58,7 +58,7 @@ void testCylinderMask() {
     for (int i = 0; i < nx * ny; ++i) {
         if (mask[i] == 1) solidCount++;
     }
-    double expectedArea = M_PI * r * r;
+    double expectedArea = std::acos(-1.0) * r * r;
     double tolerance = 0.15 * expectedArea;
     assert(std::abs(solidCount - expectedArea) <= tolerance);
 
